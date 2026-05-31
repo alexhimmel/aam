@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试报告 - AAM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .status-ok { color: #10b981; }
+        .status-failed { color: #ef4444; }
+        .status-error { color: #f59e0b; }
+        .pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <!-- 导航栏 -->
+        <nav class="bg-white shadow mb-8">
+            <div class="container mx-auto px-4">
+                <div class="flex justify-between items-center">
+                    <h1 class="text-2xl font-bold text-gray-800">
+                        🧪 测试报告 - AAM
+                    </h1>
+                    <div class="space-x-4">
+                        <button onclick="refreshReport()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                            🔄 刷新
+                        </button>
+                        <a href="/" class="text-blue-600 hover:text-blue-800">返回首页</a>
+                        <a href="/api/v1/tests/results" class="text-blue-600 hover:text-blue-800">API 文档</a>
+                    </div>
+                </div>
+            </div>
+        </nav>
+        
+        <!-- 加载状态 -->
+        <div id="loading" class="text-center py-12">
+            <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto"></div>
+            <p class="mt-4 text-gray-600">正在运行测试...</p>
+        </div>
+        
+        <!-- 测试报告内容 -->
+        <div id="report-content" class="hidden">
+            <!-- 概览卡片 -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <div class="text-3xl font-bold text-green-600" id="passed-count">
+                        <span class="pulse">-</span>
+                    </div>
+                    <div class="text-gray-600">通过</div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <div class="text-3xl font-bold text-red-600" id="failed-count">
+                        <span class="pulse">-</span>
+                    </div>
+                    <div class="text-gray-600">失败</div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <div class="text-3xl font-bold text-yellow-600" id="error-count">
+                        <span class="pulse">-</span>
+                    </div>
+                    <div class="text-gray-600">错误</div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <div class="text-3xl font-bold text-blue-600" id="success-rate">
+                        <span class="pulse">-</span>%
+                    </div>
+                    <div class="text-gray-600">通过率</div>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                <!-- 执行时间 -->
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h2 class="text-xl font-semibold mb-4">⏱️ 执行时间</h2>
+                    <p class="text-gray-700" id="duration">
+                        <span class="pulse">-</span>
+                    </p>
+                </div>
+                
+                <!-- 测试时间 -->
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h2 class="text-xl font-semibold mb-4">🕐 测试时间</h2>
+                    <p class="text-gray-700" id="timestamp">
+                        <span class="pulse">-</span>
+                    </p>
+                </div>
+            </div>
+            
+            <!-- 测试列表 -->
+            <div class="bg-white p-6 rounded-lg shadow mb-8">
+                <h2 class="text-xl font-semibold mb-4">📊 测试结果列表</h2>
+                <div id="tests-container" class="space-y-2">
+                    <div class="text-center text-gray-500 py-8">加载中...</div>
+                </div>
+            </div>
+            
+            <!-- 详细输出 -->
+            <div class="bg-white p-6 rounded-lg shadow mb-8">
+                <h2 class="text-xl font-semibold mb-4">📝 详细输出</h2>
+                <pre class="bg-gray-100 p-4 rounded text-sm overflow-auto max-h-96" id="output">
+<span class="pulse">-</span>
+                </pre>
+            </div>
+            
+            <!-- 状态指示器 -->
+            <div class="bg-green-50 p-6 rounded-lg shadow mb-8">
+                <h3 class="font-semibold mb-2 text-green-800">✅ 测试通过</h3>
+                <p class="text-green-700" id="success-message">
+                    <span class="pulse">-</span>
+                </p>
+            </div>
+            
+            <!-- 错误提示 -->
+            <div id="error-container" class="hidden bg-red-50 p-6 rounded-lg shadow mb-8">
+                <h3 class="font-semibold mb-2 text-red-800">❌ 测试失败</h3>
+                <pre class="bg-red-100 p-4 rounded text-sm overflow-auto max-h-96" id="error-output">
+<span class="pulse">-</span>
+                </pre>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        async function refreshReport() {
+            try {
+                const response = await fetch('/api/v1/tests/results');
+                const data = await response.json();
+                
+                // 隐藏加载，显示内容
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('report-content').classList.remove('hidden');
+                
+                // 更新概览卡片
+                document.getElementById('passed-count').innerHTML = data.passed || '0';
+                document.getElementById('failed-count').innerHTML = data.failed || '0';
+                document.getElementById('error-count').innerHTML = data.errors || '0';
+                document.getElementById('success-rate').innerHTML = data.success_rate || '0';
+                document.getElementById('duration').innerHTML = data.duration || 'N/A';
+                document.getElementById('timestamp').innerHTML = data.timestamp || '';
+                
+                // 测试列表
+                const testsContainer = document.getElementById('tests-container');
+                if (data.output && !data.error) {
+                    const tests = [];
+                    data.output.split('\n').forEach(line => {
+                        if ('...' in line) {
+                            const parts = line.split('...');
+                            const testName = parts[0].trim();
+                            const status = parts.slice(1).join('...').trim();
+                            const statusClass = status === 'ok' ? 'status-ok' : (status === 'FAILED' ? 'status-failed' : 'status-error');
+                            tests.push(`<div class="flex items-center justify-between p-3 rounded hover:bg-gray-50">
+                                <span class="font-mono text-sm">${status === 'ok' ? '✅' : '❌'} ${testName}</span>
+                                <span class="text-sm ${statusClass}">${status}</span>
+                            </div>`);
+                        }
+                    });
+                    testsContainer.innerHTML = tests.length > 0 ? tests.join('') : '<p class="text-center text-gray-500 py-8">暂无测试数据</p>';
+                }
+                
+                // 详细输出
+                document.getElementById('output').innerHTML = data.output || '';
+                
+                // 成功消息
+                document.getElementById('success-message').innerHTML = 
+                    data.passed > 0 ? '所有测试已通过！' : 
+                    (data.failed === 0 && data.errors === 0 ? '测试运行完成，无失败' : '请查看失败测试详情');
+                
+                // 错误容器
+                const errorContainer = document.getElementById('error-container');
+                if (data.error) {
+                    errorContainer.classList.remove('hidden');
+                    document.getElementById('error-output').innerHTML = data.error || data.error_traceback || '';
+                } else {
+                    errorContainer.classList.add('hidden');
+                }
+                
+            } catch (error) {
+                console.error('获取测试报告失败:', error);
+                alert('获取测试报告失败：' + error.message);
+            }
+        }
+        
+        // 页面加载时自动刷新
+        refreshReport();
+        
+        // 5 分钟后自动刷新
+        setTimeout(refreshReport, 300000);
+    </script>
+</body>
+</html>

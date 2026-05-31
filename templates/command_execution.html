@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AAM - 命令执行 - 自动化任务管理</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <!-- 导航栏 -->
+        <nav class="bg-white shadow mb-8">
+            <div class="container mx-auto px-4">
+                <div class="flex justify-between items-center">
+                    <h1 class="text-2xl font-bold text-gray-800">🔧 AAM - 命令执行</h1>
+                    <div class="space-x-4">
+                        <a href="/docs" class="text-blue-600 hover:text-blue-800">API 文档</a>
+                        <a href="/tests/results" class="text-blue-600 hover:text-blue-800">测试报告</a>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- 命令执行区域 -->
+        <div class="bg-white p-6 rounded-lg shadow mb-8">
+            <h2 class="text-xl font-semibold mb-4">⚡ 远程命令执行</h2>
+            
+            <form id="execute-command-form" class="space-y-4">
+                <div>
+                    <label class="block text-gray-700 mb-2">目标主机（IP 或主机名）</label>
+                    <input type="text" id="target-host" required 
+                           class="w-full border rounded p-2 font-mono"
+                           placeholder="例如：192.168.1.100 或 server.example.com">
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 mb-2">执行命令</label>
+                    <textarea id="command-input" required rows="3" 
+                              class="w-full border rounded p-2 font-mono"
+                              placeholder="例如：uptime, df -h, ps aux | head -10"></textarea>
+                </div>
+
+                <div class="flex items-center space-x-4">
+                    <label class="flex items-center">
+                        <input type="checkbox" id="show-output" checked class="mr-2">
+                        <span>显示输出</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="checkbox" id="enable-ssh-port" checked class="mr-2">
+                        <span>使用自定义 SSH 端口</span>
+                    </label>
+                    <input type="number" id="ssh-port" value="22" min="1" max="65535"
+                           class="w-20 border rounded p-2"
+                           placeholder="SSH 端口"
+                           style="display:none;">
+                </div>
+
+                <button type="submit" 
+                        class="bg-green-600 text-white px-6 py-3 rounded hover:bg-green-700 font-semibold">
+                    🚀 执行命令
+                </button>
+                <button type="button" onclick="clearForm()"
+                        class="bg-gray-500 text-white px-6 py-3 rounded hover:bg-gray-600">
+                    🗑️ 清空表单
+                </button>
+            </form>
+        </div>
+
+        <!-- 执行结果区域 -->
+        <div id="result-container" class="bg-white p-6 rounded-lg shadow mb-8">
+            <h2 class="text-xl font-semibold mb-4">📊 执行结果</h2>
+            <div id="result-content" class="space-y-4">
+                <p class="text-gray-500 text-center py-8">等待执行命令...</p>
+            </div>
+        </div>
+
+        <!-- 任务列表 -->
+        <div class="bg-white p-6 rounded-lg shadow">
+            <h2 class="text-xl font-semibold mb-4">📋 已保存的任务</h2>
+            <div id="task-list" class="space-y-4">
+                <p class="text-gray-500 text-center py-4">加载中...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模态框：输出显示 -->
+    <div id="output-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 class="text-lg font-semibold">📄 命令输出</h3>
+                <div class="space-x-2">
+                    <button onclick="copyOutput()" class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">复制</button>
+                    <button onclick="closeModal()" class="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm">关闭</button>
+                </div>
+            </div>
+            <div class="flex-1 p-4 bg-gray-900 text-green-400 font-mono text-sm overflow-auto" id="output-content">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 表单提交
+        document.getElementById('execute-command-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const host = document.getElementById('target-host').value.trim();
+            const command = document.getElementById('command-input').value.trim();
+            const showOutput = document.getElementById('show-output').checked;
+            const useCustomPort = document.getElementById('enable-ssh-port').checked;
+            const sshPort = document.getElementById('ssh-port').value;
+
+            // 显示/隐藏 SSH 端口输入
+            if (useCustomPort) {
+                document.getElementById('ssh-port').style.display = 'block';
+            } else {
+                document.getElementById('ssh-port').style.display = 'none';
+            }
+
+            if (!host || !command) {
+                alert('请填写目标主机和执行命令');
+                return;
+            }
+
+            // 显示加载状态
+            const resultContent = document.getElementById('result-content');
+            resultContent.innerHTML = `
+                <div class="text-center py-8">
+                    <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                    <p class="text-gray-600">正在连接到 ${host} 并执行命令...</p>
+                    <p class="text-gray-500 text-sm mt-2">命令：<code class="bg-gray-100 px-2 py-1 rounded">${command}</code></p>
+                </div>
+            `;
+
+            // 调用 API 执行命令
+            try {
+                const response = await fetch('/api/v1/tasks/execute', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        name: `临时命令：${command.substring(0, 50)}...`,
+                        command: command,
+                        hosts: host,
+                        task_type: 'command',
+                        timeout_seconds: 300,
+                        max_retries: 1,
+                        retry_delay_seconds: 60,
+                        ssh_port: useCustomPort ? parseInt(sshPort) : 22
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    if (showOutput) {
+                        // 显示输出模态框
+                        setTimeout(() => {
+                            document.getElementById('output-content').textContent = data.output || '无输出';
+                            document.getElementById('output-modal').classList.remove('hidden');
+                        }, 100);
+                    }
+
+                    // 添加到任务列表
+                    addTaskToList(data.task);
+                } else {
+                    alert('执行失败：' + (data.error || '未知错误'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('请求失败：' + error.message);
+            }
+        });
+
+        // 添加任务到列表
+        function addTaskToList(task) {
+            const taskList = document.getElementById('task-list');
+            const taskDiv = document.createElement('div');
+            taskDiv.className = 'border rounded p-4';
+            taskDiv.innerHTML = `
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 class="font-semibold text-gray-800">${task.name}</h3>
+                        <p class="text-sm text-gray-600 mt-1">主机：${task.target_hosts}</p>
+                        <p class="text-sm text-gray-600">状态：${task.status}</p>
+                    </div>
+                    <span class="text-xs text-gray-500">${task.created_at}</span>
+                </div>
+            `;
+            taskList.insertBefore(taskDiv, taskList.firstChild);
+        }
+
+        // 清空表单
+        function clearForm() {
+            document.getElementById('execute-command-form').reset();
+            document.getElementById('ssh-port').style.display = 'none';
+            document.getElementById('result-content').innerHTML = `
+                <p class="text-gray-500 text-center py-8">等待执行命令...</p>
+            `;
+        }
+
+        // 关闭模态框
+        function closeModal() {
+            document.getElementById('output-modal').classList.add('hidden');
+        }
+
+        // 复制输出
+        function copyOutput() {
+            const output = document.getElementById('output-content').textContent;
+            navigator.clipboard.writeText(output).then(() => {
+                alert('输出已复制到剪贴板');
+            }).catch(err => {
+                alert('复制失败：' + err.message);
+            });
+        }
+
+        // 按回车键执行（如果 Ctrl+Enter）
+        document.getElementById('command-input').addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('execute-command-form').dispatchEvent(new Event('submit'));
+            }
+        });
+    </script>
+</body>
+</html>

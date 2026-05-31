@@ -1,0 +1,51 @@
+"""
+AAM 配置文件
+自动化任务管理
+"""
+
+# ==================== 数据库配置 ====================
+# 数据库类型：postgresql 或 sqlite
+DATABASE_TYPE = "postgresql"
+
+# PostgreSQL 连接字符串
+DATABASE_URL = "postgresql://aam:aam@localhost:5432/aam"
+
+# SQLite 路径（开发环境）
+# SQLITE_DB_PATH = "/tmp/aam.db"
+
+# 连接池配置
+DATABASE_POOL_SIZE = 10
+DATABASE_MAX_OVERFLOW = 20
+DATABASE_POOL_RECYCLE = 3600
+
+# ==================== SSH 配置 ====================
+SSH_POOL_SIZE = 20  # 最大并发连接数
+DEFAULT_SSH_USER = "root"
+DEFAULT_SSH_PORT = 22
+
+# ==================== 应用配置 ====================
+APP_HOST = "0.0.0.0"
+APP_PORT = 8000
+DEBUG = False  # 开发环境设为 True
+
+# ==================== 日志配置 ====================
+LOG_FILE = "logs/app.log"
+LOG_LEVEL = "INFO"
+
+# ==================== 通知配置 ====================
+NOTIFICATION_ENABLED = True
+NOTIFICATION_EMAIL = {
+    'enabled': True,
+    'smtp_server': 'smtp.example.com',
+    'smtp_port': 587,
+    'use_tls': True,
+    'username': 'aam@example.com',
+    'password': 'your_password',
+    'from': 'aam@example.com',
+    'to': 'admin@example.com'
+}
+NOTIFICATION_WEBHOOK = {
+    'enabled': False,
+    'url': 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL',
+    'platform': 'slack'  # slack/discord/dingtalk
+}
