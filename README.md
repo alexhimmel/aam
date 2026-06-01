@@ -19,11 +19,96 @@ AAM (Automated Task Management) 是一个用于管理自动化任务执行的命
 - **Python 3.10+**
 - **FastAPI** - Web API 框架
 - **SQLAlchemy** - ORM 数据库
-- **Paramiko** - SSH 客户端
+- **Paramiko** - SSH 客户端（异步支持）
 - **APScheduler** - 定时任务调度
 - **PostgreSQL** / **SQLite** - 数据库
+- **asyncio.to_thread** - 异步/同步混用
+
+## ⚠️ 关键修复（重要）
+
+### Bug 修复
+- ✅ **SSH 连接方法**：修复 `get_connection()` 调用方式
+- ✅ **认证配置**：支持用户名/密钥/密码多方式认证
+- ✅ **异步处理**：使用 `asyncio.to_thread()` 包装 Paramiko 同步调用
+- ✅ **批量执行**：修复批量任务执行逻辑
+
+### 架构改进
+- ✅ **连接池**：实现 SSH 连接复用机制
+- ✅ **健康检查**：添加 `/health`、`/ready`、`/live` 端点
+- ✅ **Docker 化**：提供 Dockerfile 和 docker-compose.yml
+- ✅ **单元测试**：完整的测试覆盖
+
+### 安全建议
+- ⚠️ **SSH 主机密钥验证**：生产环境应验证密钥
+- ⚠️ **敏感数据加密**：SSH 密码应加密存储
+- ⚠️ **API 认证**：建议添加 JWT 用户认证/授权
 
 ## 快速开始
+
+### 1. 环境准备
+
+```bash
+# 创建虚拟环境
+python3 -m venv venv
+source venv/bin/activate  # Linux/Mac
+# 或
+venv\Scripts\activate      # Windows
+
+# 安装依赖
+pip install -r requirements.txt
+```
+
+### 2. 数据库配置
+
+修改 `config.py` 配置数据库：
+
+```python
+# PostgreSQL
+DATABASE_TYPE = "postgresql"
+DATABASE_URL = "postgresql://aam:***@localhost:5432/aam"
+
+# 或 SQLite（开发环境）
+DATABASE_TYPE = "sqlite"
+SQLITE_DB_PATH = "/tmp/aam.db"
+```
+
+### 3. 初始化数据库
+
+```bash
+python init_db.py
+```
+
+### 4. 启动服务
+
+```bash
+# 方式一：直接运行
+uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+
+# 方式二：使用 CLI
+python -m app.cli
+
+# 方式三：后台运行
+nohup uvicorn app.api.main:app --host 0.0.0.0 --port 8000 > logs/server.log 2>&1 &
+```
+
+### 5. Docker 部署（可选）
+
+```bash
+# 构建镜像
+docker build -t aam .
+
+# 或使用 docker-compose
+docker-compose up -d
+
+# 查看日志
+docker-compose logs -f aam
+```
+
+### 6. 访问界面
+
+- **Web 界面**: http://localhost:8000
+- **API 文档**: http://localhost:8000/docs
+- **健康检查**: http://localhost:8000/health
 
 ### 1. 环境准备
 

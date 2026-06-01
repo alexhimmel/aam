@@ -1,0 +1,53 @@
+# AAM - Automated Task Management
+# Docker Compose 配置
+
+version: '3.8'
+
+services:
+  # AAM 主服务
+  aam:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_TYPE=sqlite
+      - SQLITE_DB_PATH=/app/data/aam.db
+    volumes:
+      - aam_data:/app/data
+      - aam_logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - aam_network
+
+  # PostgreSQL 数据库（可选）
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: aam
+      POSTGRES_PASSWORD: aam_password
+      POSTGRES_DB: aam
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aam -d aam"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - aam_network
+
+volumes:
+  aam_data:
+  aam_logs:
+  postgres_data:
+
+networks:
+  aam_network:
+    driver: bridge
