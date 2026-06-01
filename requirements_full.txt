@@ -1,0 +1,55 @@
+# AAM - 自动化任务管理 - 完整依赖
+# Web 框架
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+
+# 数据库
+sqlalchemy>=2.0.23
+alembic>=1.13.0
+
+# 认证
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+
+# SSH 连接
+paramiko>=3.4.0
+
+# 日志
+python-json-logger>=2.0.0
+
+# 工具
+python-dotenv>=1.0.0
+aiofiles>=23.2.1
+
+# 测试
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+
+# 其他
+aiohttp>=3.9.0
+python-dateutil>=2.8.2
+
+# FastAPI 额外依赖
+starlette>=0.27.0
+httpx>=0.25.0
+anyio>=4.0.0
+annotated-doc>=0.0.1
+email-validator>=2.0.0
+typing-extensions>=4.0.0
+typing-inspection>=0.0.2
+
+# 密码学
+cryptography>=41.0.0
+bcrypt>=4.0.0
+
+# SSH 密码学
+pynacl>=1.5.0
+
+# 调度器
+APScheduler>=3.10.0
+
+# 可选
+redis>=5.0.0
+celery>=5.3.0

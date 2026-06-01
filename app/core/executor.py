@@ -5,7 +5,7 @@
 from typing import Callable, List, Optional
 import asyncio
 import os
-from app.core.ssh import SSHConnectionPool, SFTPConnectionPool
+from app.core.ssh import SSHConnectionPool
 from app.utils.task_type import TaskTypeIdentifier, identify_task
 from app.core.notification import NotificationService
 
@@ -18,11 +18,10 @@ class TaskExecutor:
         初始化任务执行器
         
         Args:
-            ssh_pool: SSH 连接池
+            ssh_pool: SSH 连接池（包含 SFTP 功能）
             notification_service: 通知服务（可选）
         """
         self.ssh_pool = ssh_pool
-        self.sftp_pool = SFTPConnectionPool(ssh_pool)
         self.task_type_identifier = TaskTypeIdentifier()
         self.notification_service = notification_service
     
@@ -104,11 +103,11 @@ class TaskExecutor:
         # 构建上传路径
         remote_path = os.path.join(upload_dir, os.path.basename(local_file))
         
-        # 并发上传文件
+        # 并发上传文件（使用 SSH 连接池的 SFTP 功能）
         upload_tasks = [(host, local_file, remote_path) for host in hosts]
         upload_results = []
         
-        for result in await self.sftp_pool.execute_batch(upload_tasks):
+        for result in await self.ssh_pool.sftp_execute_batch(upload_tasks):
             result['task_id'] = task_id
             upload_results.append(result)
         

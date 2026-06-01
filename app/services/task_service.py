@@ -167,7 +167,7 @@ class TaskService:
                 except Exception as e:
                     host_output.append(f"连接失败：{str(e)}\n")
                     if attempt < max_retries - 1:
-                        time.sleep(retry_delay_seconds)
+                        await asyncio.sleep(retry_delay_seconds)
                     else:
                         break
             

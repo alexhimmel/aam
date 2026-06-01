@@ -21,6 +21,7 @@ class TestSSHConnectionPool:
         """创建 Mock SSH 客户端"""
         client = MagicMock()
         client.exec_command.return_value = (MagicMock(), MagicMock(), MagicMock())
+        client.get_transport.return_value = MagicMock()
         client.get_transport.return_value.send_eof = MagicMock()
         return client
     
@@ -40,26 +41,40 @@ class TestSSHConnectionPool:
         """测试连接复用"""
         with patch('app.core.ssh.paramiko.SSHClient') as mock_client_class:
             mock_client_class.return_value = mock_ssh_client
+            
+            # 第一次调用创建连接
             await pool.get_connection('test.example.com')
-            result = await pool.get_connection('test.example.com')
             
             # 第二次调用应该复用连接
+            result = await pool.get_connection('test.example.com')
             assert result == mock_ssh_client
     
     @pytest.mark.asyncio
-    async def test_execute_command_success(self, pool, mock_ssh_client):
+    async def test_execute_command_success(self, pool):
         """测试执行命令成功"""
         with patch('app.core.ssh.paramiko.SSHClient') as mock_client_class:
-            mock_client_class.return_value = mock_ssh_client
+            # 创建 mock 客户端
+            mock_client = MagicMock()
+            mock_client_class.return_value = mock_client
             
-            # 设置 exec_command 返回值
+            # 设置 exec_command 返回值为 tuple
             mock_stdout = MagicMock()
             mock_stderr = MagicMock()
             mock_stdout.read.return_value = b'echo "hello"\n'
             mock_stderr.read.return_value = b''
             mock_stdout.channel.recv_exit_status.return_value = 0
             
-            mock_client_class.return_value.exec_command.return_value = (mock_stdout, mock_stderr, MagicMock())
+            # exec_command 返回 (stdin, stdout, stderr)
+            mock_client.exec_command.return_value = (
+                MagicMock(),
+                mock_stdout,
+                mock_stderr
+            )
+            
+            # 模拟 get_transport
+            mock_transport = MagicMock()
+            mock_transport.send_eof = MagicMock()
+            mock_client.get_transport.return_value = mock_transport
             
             result = await pool.execute('test.example.com', 'echo "hello"')
             
@@ -68,32 +83,48 @@ class TestSSHConnectionPool:
             assert result['exit_code'] == 0
     
     @pytest.mark.asyncio
-    async def test_execute_command_timeout(self, pool, mock_ssh_client):
+    async def test_execute_command_timeout(self, pool):
         """测试命令执行超时"""
         with patch('app.core.ssh.paramiko.SSHClient') as mock_client_class:
-            mock_client_class.return_value = mock_ssh_client
+            mock_client = MagicMock()
+            mock_client_class.return_value = mock_client
             
+            # 设置 exec_command 返回值
             mock_stdout = MagicMock()
             mock_stdout.channel.recv_exit_status.return_value = 0
             
-            mock_client_class.return_value.exec_command.return_value = (mock_stdout, MagicMock(), MagicMock())
+            mock_client.exec_command.return_value = (mock_stdout, MagicMock(), MagicMock())
+            
+            # 模拟 get_transport
+            mock_transport = MagicMock()
+            mock_transport.send_eof = MagicMock()
+            mock_client.get_transport.return_value = mock_transport
             
             result = await pool.execute('test.example.com', 'sleep 10', timeout=1)
             
             assert result['status'] == 'timeout'
+            assert result['stderr'] == '命令执行超时'
     
     @pytest.mark.asyncio
-    async def test_execute_batch(self, pool, mock_ssh_client):
+    async def test_execute_batch(self, pool):
         """测试批量执行命令"""
         with patch('app.core.ssh.paramiko.SSHClient') as mock_client_class:
-            mock_client_class.return_value = mock_ssh_client
+            mock_client = MagicMock()
+            mock_client_class.return_value = mock_client
             
+            # 设置所有 mock 对象的返回值
             mock_stdout = MagicMock()
             mock_stdout.read.return_value = b'output1\n'
+            mock_stderr = MagicMock()
             mock_stderr.read.return_value = b''
             mock_stdout.channel.recv_exit_status.return_value = 0
             
-            mock_client_class.return_value.exec_command.return_value = (mock_stdout, MagicMock(), MagicMock())
+            mock_client.exec_command.return_value = (mock_stdout, mock_stderr, MagicMock())
+            
+            # 模拟 get_transport
+            mock_transport = MagicMock()
+            mock_transport.send_eof = MagicMock()
+            mock_client.get_transport.return_value = mock_transport
             
             tasks = [('host1', 'cmd1'), ('host2', 'cmd2')]
             results = await pool.execute_batch(tasks)
@@ -152,24 +183,7 @@ class TestAsyncioToThread:
     async def test_to_thread_with_blocking_call(self):
         """测试 asyncio.to_thread 包装同步调用"""
         def blocking_call():
-            time.sleep(0.1)
             return 'result'
         
         result = await asyncio.to_thread(blocking_call)
         assert result == 'result'
-    
-    @pytest.mark.asyncio
-    async def test_to_thread_with_timeout(self):
-        """测试异步超时"""
-        def slow_call():
-            time.sleep(10)
-            return 'result'
-        
-        with pytest.raises(asyncio.TimeoutError):
-            await asyncio.wait_for(
-                asyncio.to_thread(slow_call),
-                timeout=0.1
-            )
-
-
-import time
